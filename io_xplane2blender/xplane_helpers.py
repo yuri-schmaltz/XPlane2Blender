@@ -1,10 +1,9 @@
 import datetime
 import itertools
-import os
 import re
 from datetime import timezone
-from typing import Iterable, List, Optional, Tuple, Union
 from pathlib import Path
+from typing import Iterable, List, Optional, Tuple, Union
 
 import bpy
 import mathutils
@@ -56,12 +55,25 @@ def floatToStr(n: float) -> str:
 
 
 def resolveBlenderPath(path: str) -> str:
-    blenddir = os.path.dirname(bpy.context.blend_data.filepath)
+    """Resolve Blender-style paths starting with ``//`` to absolute paths.
 
-    if path[0:2] == "//":
-        return os.path.join(blenddir, path[2:])
-    else:
+    Parameters
+    ----------
+    path: str
+        Path that may be relative to the current ``.blend`` file.
+
+    Returns
+    -------
+    str
+        Absolute path corresponding to ``path``.
+    """
+    if not path:
         return path
+
+    blenddir = Path(bpy.context.blend_data.filepath).parent
+    if path.startswith("//"):
+        return str(blenddir / path[2:])
+    return path
 
 
 def effective_normal_metalness(xp_file: "xplane_file.XPlaneFile") -> bool:
@@ -83,7 +95,8 @@ def is_path_decal_lib(file_path: str) -> bool:
 
 
 def get_plugin_resources_folder() -> str:
-    return os.path.join(os.path.dirname(__file__), "resources")
+    """Return the path to this add-on's resources folder."""
+    return str(Path(__file__).parent / "resources")
 
 
 def get_potential_objects_in_exportable_root(
@@ -107,7 +120,7 @@ def get_potential_objects_in_exportable_root(
 
 
 def get_rotation_from_rotatable(
-    obj_or_bone: Union[bpy.types.Object, bpy.types.PoseBone]
+    obj_or_bone: Union[bpy.types.Object, bpy.types.PoseBone],
 ) -> Union[mathutils.Euler, mathutils.Quaternion, Tuple[float, float, float, float]]:
     """Returns a copy of the rotation, in whatever mode was given"""
     rotation_mode = obj_or_bone.rotation_mode

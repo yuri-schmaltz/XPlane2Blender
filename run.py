@@ -6,9 +6,10 @@
 # python3 run.py --blender /Applications/Blender.app/Contents/MacOS/Blender
 
 import argparse
-import os
 import subprocess
 import sys
+from pathlib import Path
+
 
 def _make_argparse():
     parser = argparse.ArgumentParser(description="Runs the XPlane2Blender test suite")
@@ -35,6 +36,18 @@ def _make_argparse():
 
 
 def main(argv=None) -> int:
+    """Launch Blender with the XPlane2Blender add-on loaded.
+
+    Parameters
+    ----------
+    argv: argparse.Namespace | None
+        Parsed arguments. If ``None``, arguments are read from ``sys.argv``.
+
+    Returns
+    -------
+    int
+        The exit code returned by Blender.
+    """
 
     if argv is None:
         argv = _make_argparse().parse_args(sys.argv[1:])
@@ -43,7 +56,7 @@ def main(argv=None) -> int:
         argv.blender,
         "--addons",
         "io_xplane2blender",
-                "--factory-startup",
+        "--factory-startup",
     ]
 
     if argv.no_factory_startup:
@@ -62,15 +75,14 @@ def main(argv=None) -> int:
     print(" ".join(blender_args))
 
     # Environment variables - in order for --addons to work, we need to have OUR folder
-    # exist, and we need to have "addons/modules" simlink BACK to us to create the illusion
+    # exist, and we need to have "addons/modules" symlink back to us to create the illusion
     # of the directory structure Blender expects.
-    enviro={"BLENDER_USER_SCRIPTS": os.path.dirname(os.path.realpath(__file__))}
+    enviro = {"BLENDER_USER_SCRIPTS": str(Path(__file__).resolve().parent)}
 
     # Run Blender, normalize output line endings because Windows is dumb
-    out = subprocess.run(
-        blender_args, universal_newlines=True, env=enviro
-    )  # type: str
+    out = subprocess.run(blender_args, universal_newlines=True, env=enviro)
+    return out.returncode
 
 
-main()
-
+if __name__ == "__main__":
+    sys.exit(main())

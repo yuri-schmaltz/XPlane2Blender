@@ -1,15 +1,14 @@
 """The starting point for the export process, the start of the addon"""
 
-import os
-import os.path
 import sys
+from pathlib import Path
 from typing import IO, Any, Optional
 
 import bpy
 import mathutils
+from bpy_extras.io_utils import ExportHelper, ImportHelper
 
 import io_xplane2blender
-from bpy_extras.io_utils import ExportHelper, ImportHelper
 
 from .xplane_config import getDebug
 from .xplane_helpers import XPlaneLogger, logger
@@ -48,9 +47,9 @@ class EXPORT_OT_ExportXPlane(bpy.types.Operator, ExportHelper):
     )
 
     only_selected_roots: bpy.props.BoolProperty(
-        name = "Only Selected Roots",
-        description = "If true, only valid selected roots will be exported",
-        default=False
+        name="Only Selected Roots",
+        description="If true, only valid selected roots will be exported",
+        default=False,
     )
 
     export_is_relative: bpy.props.BoolProperty(
@@ -73,7 +72,7 @@ class EXPORT_OT_ExportXPlane(bpy.types.Operator, ExportHelper):
         export_directory = self.properties.filepath
 
         if not self.properties.export_is_relative:
-            export_directory = os.path.dirname(export_directory)
+            export_directory = str(Path(export_directory).parent)
         else:
             if bpy.context.blend_data.filepath == "":
                 # We can't just save files relative to nothing somewhere on a users HDD (bad usability!) so we say there is an error.
@@ -99,9 +98,7 @@ class EXPORT_OT_ExportXPlane(bpy.types.Operator, ExportHelper):
         bpy.context.view_layer.update()
 
         xplaneFiles = xplane_file.createFilesFromBlenderRootObjects(
-            bpy.context.scene, 
-            bpy.context.view_layer,
-            self.only_selected_roots            
+            bpy.context.scene, bpy.context.view_layer, self.only_selected_roots
         )
         for xplaneFile in xplaneFiles:
             if not self._writeXPlaneFile(xplaneFile, export_directory):
@@ -166,9 +163,9 @@ class EXPORT_OT_ExportXPlane(bpy.types.Operator, ExportHelper):
         # log out to a file if logging is enabled
         if debug and bpy.context.scene.xplane.log:
             if bpy.context.blend_data.filepath != "":
-                filepath = os.path.dirname(bpy.context.blend_data.filepath)
+                filepath = Path(bpy.context.blend_data.filepath).parent
                 # Something this? self.logfile = os.path.join(dir,name+'_'+time.strftime("%y-%m-%d-%H-%M-%S")+'_xplane2blender.log')
-                self.logFile = open(os.path.join(filepath, "xplane2blender.log"), "w")
+                self.logFile = open(filepath / "xplane2blender.log", "w")
                 logger.addTransport(XPlaneLogger.FileTransport(self.logFile), logLevels)
             else:
                 logger.error("Cannot create log file if .blend file is not saved")
@@ -196,7 +193,7 @@ class EXPORT_OT_ExportXPlane(bpy.types.Operator, ExportHelper):
         # Change any backslashes to foward slashes for file paths
         xplaneFile.filename = xplaneFile.filename.replace("\\", "/")
 
-        if os.path.isabs(xplaneFile.filename):
+        if Path(xplaneFile.filename).is_absolute():
             logger.error(
                 "Bad export path %s: File paths must be relative to the .blend file"
                 % (xplaneFile.filename)
@@ -207,13 +204,11 @@ class EXPORT_OT_ExportXPlane(bpy.types.Operator, ExportHelper):
         # Append .obj if needed
         # Make paths based on the absolute path
         # Write
-        relpath = os.path.normpath(os.path.join(directory, xplaneFile.filename))
-        if not ".obj" in relpath:
-            relpath += ".obj"
+        relpath = Path(directory) / xplaneFile.filename
+        if relpath.suffix != ".obj":
+            relpath = relpath.with_suffix(".obj")
 
-        fullpath = os.path.abspath(
-            os.path.join(os.path.dirname(bpy.context.blend_data.filepath), relpath)
-        )
+        fullpath = (Path(bpy.context.blend_data.filepath).parent / relpath).resolve()
         out = xplaneFile.write()
 
         if logger.hasErrors():
@@ -223,11 +218,11 @@ class EXPORT_OT_ExportXPlane(bpy.types.Operator, ExportHelper):
         dry_run = bpy.context.scene.xplane.dev_export_as_dry_run
         if not plugin_development or (plugin_development and not dry_run):
             try:
-                os.makedirs(os.path.dirname(fullpath), exist_ok=True)
+                fullpath.parent.mkdir(parents=True, exist_ok=True)
             except OSError as e:
                 logger.error(e)
             else:
-                with open(fullpath, "w") as objFile:
+                with fullpath.open("w") as objFile:
                     logger.info("Writing %s" % fullpath)
                     objFile.write(out)
                     logger.success("Wrote %s" % fullpath)
